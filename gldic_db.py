@@ -73,12 +73,14 @@ class gldb():
         with codecs.open(src_file_f,mode="r",encoding="utf-8") as f:
             wordjson=json.load(f,encoding="utf-8")
         word=wordjson["word"]
-        pron=wordjson["pron"] if wordjson["pron"]!=False else ""
+        pron=wordjson["pron"] if wordjson["pron"] else ""
         defsimp=self.make_defzh(wordjson)
-        del wordjson["more_sen"]
-        defmjson=json.dumps(wordjson,encoding="utf-8")
-
-        sql_add_word=u'''INSERT INTO more (word,pron,defsimp,defmjson) VALUES ('%s','%s','%s','%s')'''%(word,pron,defsimp,defmjson)
+        meaning= wordjson["meaning"]
+        defen=json.dumps(meaning,encoding="utf-8") if meaning else ""
+        defen=re.sub('\^',"*",defen)
+        defen=re.sub("\'",'^',defen)
+        sql_add_word=u'''INSERT INTO more (word,pron,defsimp,defen) VALUES ('%s','%s','%s','%s')'''%(word,pron,defsimp,defen)
+        print(sql_add_word)
         db_cur.execute(sql_add_word)
 
     def make_more_table(self,r_src_path):
@@ -88,9 +90,9 @@ class gldb():
         CREATE TABLE `more`(
         `id` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
         `word` VARCHAR(56) NOT NULL DEFAULT '',
-        `pron` VARCHAR(32) NOT NULL DEFAULT '',
-        `defsimp` VARCHAR(128) NOT NULL DEFAULT '',
-        `defmjson` VARCHAR(5120) NOT NULL DEFAULT '',
+        `pron` VARCHAR(32) CHARACTER SET utf8 NOT NULL DEFAULT '',
+        `defsimp` VARCHAR(128) CHARACTER SET utf8 NOT NULL DEFAULT '',
+        `defen` VARCHAR(5120) CHARACTER SET utf8 NOT NULL DEFAULT '',
         PRIMARY KEY (`id`),
         UNIQUE KEY `word` (`word`)
         )ENGINE = MYISAM
@@ -103,15 +105,18 @@ class gldb():
         self.src_path=src_path
 
         f_list = os.listdir(src_path)
-
+        f_list.sort()
         for wfile in f_list:
             try:
-                if os.path.isfile(wfile) == True:
-                    src_file_f=os.path.join(src_path,wfile)
+                src_file_f=os.path.join(src_path,wfile)
+                if os.path.isfile(src_file_f) == True:
                     self.add_word_todb(src_file_f,cur)
 
-            except Exception:
-                pass
+            except Exception as err:
+                print(err)
+                raise err
+
+        self.closedb()
 
 
     def add_simp_word(self,src_file_f,db_cur):
@@ -168,4 +173,4 @@ if __name__ == '__main__':
     gl=gldb("www-data","135790","gldic")
 
     r_src_path=sys.argv[1]
-    gl.make_simp_table(r_src_path)
+    gl.make_more_table(r_src_path)
